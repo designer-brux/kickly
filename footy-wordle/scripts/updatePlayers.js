@@ -6,8 +6,7 @@ require("dotenv").config();
 const API_KEY = process.env.API_FOOTBALL_KEY;
 const BASE_URL = "https://v3.football.api-sports.io";
 
-// ATUALIZADO: Temporada 2025/2026 (Ano de início = 2025)
-const SEASON = 2025;
+const SEASON = 2024;
 
 // IDs dos Gigantes Europeus
 const TEAMS = [
