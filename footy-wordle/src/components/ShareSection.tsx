@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { X, Download, Copy, MessageCircle } from "lucide-react";
-import html2canvas from "html2canvas";
+import { domToPng } from "modern-screenshot";
 import { getGameNumber } from "@/lib/gameLogic";
 
 interface ShareSectionProps {
@@ -10,7 +10,7 @@ interface ShareSectionProps {
   onClose: () => void;
   won: boolean;
   guessesCount: number;
-  time: string; // Adicionei o Tempo aqui
+  time: string;
 }
 
 export default function ShareSection({
@@ -24,23 +24,47 @@ export default function ShareSection({
   const [isGenerating, setIsGenerating] = useState(false);
   const gameNumber = getGameNumber();
 
-  // Imagens de Fundo Genéricas (Sem Spoiler)
-  const WIN_BG =
-    "https://images.unsplash.com/photo-1522778119026-d647f0565c6a?q=80&w=1000&auto=format&fit=crop"; // Estádio Aceso
-  const LOSE_BG =
-    "https://images.unsplash.com/photo-1459865264687-595d652de67e?q=80&w=1000&auto=format&fit=crop"; // Gramado Dramático/Escuro
-
   if (!isOpen) return null;
+
+  // NOVOS LINKS DE IMAGEM (Estáveis)
+  // Win: Estádio iluminado com clima de celebração
+  const WIN_BG =
+    "https://images.unsplash.com/photo-1574629810360-7efbbe195018?q=80&w=1000&auto=format&fit=crop";
+
+  // Lose: Gramado com foco dramático/escuro (Mantido pois funciona)
+  const LOSE_BG =
+    "https://images.unsplash.com/photo-1459865264687-595d652de67e?q=80&w=1000&auto=format&fit=crop";
+
+  const handleDownloadImage = async () => {
+    if (!posterRef.current) return;
+    setIsGenerating(true);
+
+    try {
+      const dataUrl = await domToPng(posterRef.current, {
+        scale: 2,
+        quality: 1,
+      });
+
+      const link = document.createElement("a");
+      link.download = `footly-result-${gameNumber}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("Erro ao gerar imagem:", err);
+      alert("Erro de compatibilidade. Tente tirar um print manual!");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
   const getShareText = () => {
     const icon = won ? "🏆" : "❌";
-    // Texto misterioso para WhatsApp
-    return `Footly #${gameNumber} ${icon}\n⏱️ Time: ${time}\n🎯 Attempts: ${won ? guessesCount : "X"}/3\n\nCan you beat me? Play now: kickly.vercel.app`;
+    return `Footly #${gameNumber} ${icon}\n⏱️ Tempo: ${time}\n🎯 Tentativas: ${won ? guessesCount : "X"}/3\n\nJogue agora: kickly.vercel.app`;
   };
 
   const handleCopyText = () => {
     navigator.clipboard.writeText(getShareText());
-    alert("Text copied!");
+    alert("Texto copiado!");
   };
 
   const handleWhatsApp = () => {
@@ -48,159 +72,225 @@ export default function ShareSection({
     window.open(url, "_blank");
   };
 
-  const handleDownloadImage = async () => {
-    if (!posterRef.current) return;
-    setIsGenerating(true);
+  const overlayColor = won
+    ? "rgba(6, 78, 59, 0.85)" // Um pouco mais escuro para garantir leitura no estádio
+    : "rgba(127, 29, 29, 0.85)";
+  const accentColor = "#00D656";
 
-    try {
-      // Pequeno hack: Forçamos o html2canvas a usar um proxy para evitar erro de CORS
-      const canvas = await html2canvas(posterRef.current, {
-        scale: 2,
-        useCORS: true,
-        allowTaint: true,
-        proxy: "https://corsproxy.io/?", // Isso resolve o problema de permissão da imagem externa
-        backgroundColor: null,
-      });
-
-      const link = document.createElement("a");
-      link.download = `footly-result-${gameNumber}.png`;
-      link.href = canvas.toDataURL("image/png");
-      link.click();
-    } catch (err) {
-      console.error("Error", err);
-      alert("Erro ao gerar imagem. Tente tirar um print da tela!");
-    } finally {
-      setIsGenerating(false);
-    }
-  };
-
-  // Componente interno para o visual do Poster (Reusado no preview e no print)
-  const PosterContent = () => (
-    <div className="w-full h-full relative flex flex-col items-center justify-center text-center p-6 isolate">
-      {/* Imagem de Fundo Escurecida */}
+  const PosterVisual = ({ isPrint = false }: { isPrint?: boolean }) => (
+    <div
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: isPrint ? "40px" : "24px",
+        overflow: "hidden",
+        backgroundColor: won ? "#064e3b" : "#7f1d1d",
+      }}
+    >
       <img
         src={won ? WIN_BG : LOSE_BG}
-        className="absolute inset-0 w-full h-full object-cover -z-20"
+        alt="Fundo"
         crossOrigin="anonymous"
-        alt="Background"
-      />
-      <div
-        className={`absolute inset-0 -z-10 ${won ? "bg-green-900/60" : "bg-red-900/60"} backdrop-blur-[1px]`}
+        style={{
+          position: "absolute",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          objectFit: "cover",
+          zIndex: 1,
+        }}
       />
 
-      {/* Conteúdo */}
-      <div className="flex flex-col items-center gap-1 mb-6">
-        <span className="text-white/80 font-bold tracking-[0.2em] text-xs uppercase">
-          Footly #{gameNumber}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundColor: overlayColor,
+          zIndex: 2,
+        }}
+      />
+
+      <div
+        style={{
+          position: "relative",
+          zIndex: 3,
+          textAlign: "center",
+          width: "100%",
+        }}
+      >
+        <span
+          className="font-bold tracking-widest uppercase"
+          style={{
+            color: "white",
+            opacity: 0.8,
+            fontSize: isPrint ? "18px" : "12px",
+          }}
+        >
+          FOOTLY #{gameNumber}
         </span>
-        <h2 className="text-white text-4xl font-black italic tracking-tighter drop-shadow-lg">
+
+        <h2
+          className="font-black italic tracking-tighter"
+          style={{
+            color: "white",
+            fontSize: isPrint ? "56px" : "32px",
+            margin: "10px 0",
+            lineHeight: 1,
+          }}
+        >
           {won ? "VICTORY!" : "GAME OVER"}
         </h2>
-      </div>
 
-      {/* Caixa de Estatísticas */}
-      <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-6 w-full max-w-[200px] mb-6 shadow-2xl">
-        <div className="flex flex-col gap-4">
-          <div>
-            <p className="text-white/60 text-xs font-bold uppercase mb-1">
+        <div
+          className="rounded-3xl border border-white/20 mx-auto w-full"
+          style={{
+            backgroundColor: "rgba(255, 255, 255, 0.1)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            padding: isPrint ? "30px" : "20px",
+            margin: "20px auto",
+            maxWidth: isPrint ? "300px" : "200px",
+          }}
+        >
+          <div style={{ marginBottom: isPrint ? "20px" : "12px" }}>
+            <p
+              className="font-bold uppercase"
+              style={{
+                color: "rgba(255,255,255,0.6)",
+                fontSize: isPrint ? "14px" : "10px",
+              }}
+            >
               Time
             </p>
-            <p className="text-white text-2xl font-black">{time}</p>
+            <p
+              className="font-black text-white"
+              style={{
+                fontSize: isPrint ? "36px" : "24px",
+              }}
+            >
+              {time}
+            </p>
           </div>
-          <div className="w-full h-[1px] bg-white/10"></div>
           <div>
-            <p className="text-white/60 text-xs font-bold uppercase mb-1">
+            <p
+              className="font-bold uppercase"
+              style={{
+                color: "rgba(255,255,255,0.6)",
+                fontSize: isPrint ? "14px" : "10px",
+              }}
+            >
               Guesses
             </p>
-            <p className="text-white text-2xl font-black">
-              {won ? `${guessesCount}/3` : "Failed"}
+            <p
+              className="font-black text-white"
+              style={{
+                fontSize: isPrint ? "36px" : "24px",
+              }}
+            >
+              {won ? `${guessesCount}/3` : "X/3"}
             </p>
           </div>
         </div>
-      </div>
 
-      {/* Call to Action */}
-      <div className="mt-auto">
-        <p className="text-white font-bold text-lg drop-shadow-md">
-          Sua vez de tentar!
-        </p>
-        <p className="text-[#00D656] font-medium text-sm">kickly.vercel.app</p>
+        <div style={{ marginTop: isPrint ? "40px" : "20px" }}>
+          <p
+            className="font-bold text-white"
+            style={{
+              fontSize: isPrint ? "24px" : "16px",
+            }}
+          >
+            Now it's your turn!
+          </p>
+          <p
+            className="font-bold"
+            style={{
+              color: accentColor,
+              fontSize: isPrint ? "20px" : "14px",
+            }}
+          >
+            kickly.vercel.app
+          </p>
+        </div>
       </div>
     </div>
   );
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-sm rounded-[32px] overflow-hidden shadow-2xl flex flex-col relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl flex flex-col relative">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 z-10 p-2 bg-black/10 hover:bg-black/20 rounded-full transition-colors"
+          className="absolute top-4 right-4 z-10 p-2 bg-black/10 rounded-full hover:bg-black/20 transition-colors"
         >
           <X size={20} className="text-slate-800" />
         </button>
 
         <div className="pt-8 pb-6 px-6 text-center">
-          <h2 className="text-2xl font-black text-[#1D1B20] mb-6 tracking-tight">
+          <h2 className="text-2xl font-black text-slate-900 mb-6 tracking-tight italic">
             Share Result
           </h2>
 
-          {/* PREVIEW VISUAL */}
-          <div className="relative w-full aspect-[4/5] rounded-2xl overflow-hidden shadow-lg mb-6 bg-slate-900 group border-4 border-white">
-            <PosterContent />
+          <div className="relative w-full aspect-4/5 rounded-2xl overflow-hidden shadow-lg mb-6 border-4 border-white bg-slate-100">
+            <PosterVisual isPrint={false} />
           </div>
 
-          {/* BOTÕES DE AÇÃO */}
           <div className="flex gap-4 justify-center">
-            <ActionBtn
-              icon={<Copy size={20} />}
-              label="Text"
+            <button
               onClick={handleCopyText}
-            />
-            <ActionBtn
-              icon={<MessageCircle size={20} />}
-              label="WhatsApp"
+              className="flex flex-col items-center gap-2 group"
+            >
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 group-active:scale-95 transition-transform">
+                <Copy size={20} />
+              </div>
+              <span className="text-xs font-bold text-slate-500">Copy</span>
+            </button>
+            <button
               onClick={handleWhatsApp}
-            />
-            <ActionBtn
-              icon={
-                isGenerating ? (
+              className="flex flex-col items-center gap-2 group"
+            >
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-[#25D366] group-active:scale-95 transition-transform">
+                <MessageCircle size={20} />
+              </div>
+              <span className="text-xs font-bold text-slate-500">WhatsApp</span>
+            </button>
+            <button
+              onClick={handleDownloadImage}
+              className="flex flex-col items-center gap-2 group"
+            >
+              <div className="w-12 h-12 rounded-full bg-[#00D656] text-white flex items-center justify-center shadow-lg group-active:scale-95 transition-transform">
+                {isGenerating ? (
                   <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />
                 ) : (
                   <Download size={20} />
-                )
-              }
-              label="Save Img"
-              onClick={handleDownloadImage}
-              primary
-            />
+                )}
+              </div>
+              <span className="text-xs font-bold text-[#00D656]">
+                Save image
+              </span>
+            </button>
           </div>
         </div>
       </div>
 
-      {/* MOLDE ESCONDIDO (ALTA QUALIDADE) */}
       <div
-        ref={posterRef}
-        className="fixed -top-[9999px] left-0 w-[600px] h-[800px] text-[20px]" // Aumentei a fonte base
+        style={{
+          position: "fixed",
+          top: 0,
+          left: "-9999px",
+          width: "600px",
+          height: "800px",
+          zIndex: -1,
+        }}
       >
-        {/* Reutilizamos o mesmo layout, mas o container maior fará tudo escalar */}
-        <PosterContent />
+        <div ref={posterRef} style={{ width: "100%", height: "100%" }}>
+          <PosterVisual isPrint={true} />
+        </div>
       </div>
     </div>
-  );
-}
-
-function ActionBtn({ icon, label, onClick, primary = false }: any) {
-  return (
-    <button
-      onClick={onClick}
-      className={`flex flex-col items-center gap-2 group ${primary ? "text-[#00D656]" : "text-slate-500"}`}
-    >
-      <div
-        className={`w-14 h-14 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm ${primary ? "bg-[#00D656] text-white shadow-[#00D656]/30" : "bg-slate-100 hover:bg-slate-200"}`}
-      >
-        {icon}
-      </div>
-      <span className="text-xs font-bold">{label}</span>
-    </button>
   );
 }

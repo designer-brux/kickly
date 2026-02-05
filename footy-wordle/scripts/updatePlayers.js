@@ -6,55 +6,18 @@ require("dotenv").config();
 const API_KEY = process.env.API_FOOTBALL_KEY;
 const BASE_URL = "https://v3.football.api-sports.io";
 
-// Use 2024 (Temporada atual cheia na Europa e Brasil) ou 2025 se já virou.
 const SEASON = 2024;
-
-// CONFIGURAÇÃO DE ELITE
-// Pegamos apenas 2 páginas para garantir, mas a filtragem por minutos será o principal
 const MAX_PAGES_PER_TEAM = 2;
-const DELAY_MS = 7000; // 7s de pausa (Segurança máxima para plano Free)
+const DELAY_MS = 7000;
 
-// Lista Definitiva de IDs (API-Football)
+// Lista de Times (Brasil, Arábia, Europa)
 const TEAMS = [
-  // --- 🇧🇷 BRASILEIRÃO (G12) ---
-  126, // São Paulo
-  121, // Palmeiras
-  127, // Flamengo
-  133, // Vasco da Gama
-  120, // Botafogo
-  124, // Fluminense
-  125, // Santos (Mesmo na B, é gigante)
-  131, // Corinthians
-  130, // Grêmio
-  119, // Internacional
-  128, // Cruzeiro
-  1062, // Atlético Mineiro
-
-  // --- 🇸🇦 SAUDI PRO LEAGUE (Big 4) ---
-  293, // Al-Hilal
-  294, // Al-Nassr
-  297, // Al-Ahli
-  296, // Al-Ittihad
-
-  // --- 🇪🇺 GIGANTES EUROPEUS ---
-  // Premier League
-  33,
-  40,
-  42,
-  50,
-  49, // Man Utd, Liverpool, Arsenal, City, Chelsea
-  // La Liga
-  529,
-  530,
-  541, // Barcelona, Atleti, Real Madrid
-  // Serie A
-  492,
-  489,
-  505,
-  496, // Napoli, Milan, Inter, Juve
-  // Bundesliga
-  157,
-  165, // Bayern, Dortmund
+  // 🇧🇷 BRASILEIRÃO
+  126, 121, 127, 133, 120, 124, 125, 131, 130, 119, 128, 1062,
+  // 🇸🇦 SAUDI PRO LEAGUE
+  293, 294, 297, 296,
+  // 🇪🇺 EUROPA (Premier, La Liga, Serie A, Bundesliga)
+  33, 40, 42, 50, 49, 529, 530, 541, 492, 489, 505, 496, 157, 165,
 ];
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -64,7 +27,6 @@ async function fetchTeamPlayers(teamId) {
   let page = 1;
 
   try {
-    // Busca até 2 páginas (geralmente cobre todo o elenco principal)
     while (page <= MAX_PAGES_PER_TEAM) {
       console.log(`   ↳ Time ID ${teamId} (Página ${page})...`);
 
@@ -86,35 +48,33 @@ async function fetchTeamPlayers(teamId) {
       const list = data.response || [];
       allRawPlayers = [...allRawPlayers, ...list];
 
-      // Se acabaram as páginas, para
       if (page >= data.paging.total) break;
-
       page++;
-      // Pequena pausa entre páginas do mesmo time
       if (page <= MAX_PAGES_PER_TEAM) await delay(2000);
     }
 
-    // --- FILTRAGEM DE "TITULARES" (A Mágica) ---
-    // 1. Apenas quem tem foto
-    // 2. Ordenar por minutos jogados (do maior para o menor)
-    // 3. Pegar apenas os top 18 (Titulares + Reservas imediatos)
-
+    // --- FILTRAGEM E MAPEAMENTO ---
     const elitePlayers = allRawPlayers
       .filter(
         (item) => item.player.photo && item.statistics[0].games.minutes > 0,
       )
       .sort(
         (a, b) => b.statistics[0].games.minutes - a.statistics[0].games.minutes,
-      ) // Mais minutos primeiro
-      .slice(0, 18) // PEGA SÓ OS 18 QUE MAIS JOGAM
+      )
+      .slice(0, 18)
       .map((item) => ({
         id: item.player.id,
         name: item.player.name,
         image: item.player.photo,
         hints: [
+          // Dica 1: Posição (Sempre visível)
           mapPosition(item.statistics[0].games.position),
-          "Active", // Status
+
+          // Dica 2: Nacionalidade (Revela no 1º erro)
           item.player.nationality,
+
+          // Dica 3: Time Atual (Revela no 2º erro - Substituindo o Status)
+          item.statistics[0].team.name,
         ],
       }));
 
@@ -136,9 +96,8 @@ function mapPosition(apiPos) {
 }
 
 async function run() {
-  console.log(`🚀 Iniciando atualização BRASIL + ARÁBIA + EUROPA...`);
   console.log(
-    `ℹ️  Filtrando apenas os TOP 18 jogadores (mais minutos) de cada time.`,
+    `🚀 Iniciando atualização: [Posição, Nacionalidade, Time Atual]...`,
   );
 
   let allPlayers = [];
@@ -148,12 +107,12 @@ async function run() {
     const teamPlayers = await fetchTeamPlayers(teamId);
     allPlayers = [...allPlayers, ...teamPlayers];
 
-    console.log(`   ✅ ${teamPlayers.length} craques adicionados.`);
+    console.log(`   ✅ ${teamPlayers.length} jogadores.`);
     console.log(`   ⏳ Aguardando ${DELAY_MS / 1000}s...`);
     await delay(DELAY_MS);
   }
 
-  // Remove duplicados por ID
+  // Remove duplicados
   const uniquePlayers = Array.from(
     new Map(allPlayers.map((item) => [item.id, item])).values(),
   );
@@ -162,12 +121,12 @@ async function run() {
   const fileContent = `
 // ⚠️ ARQUIVO GERADO AUTOMATICAMENTE
 // DATA: ${new Date().toLocaleString()}
-// TOTAL: ${uniquePlayers.length} JOGADORES (Titulares e Estrelas)
+// TOTAL: ${uniquePlayers.length} JOGADORES
 
 export interface Player {
   id: number;
   name: string;
-  hints: string[];
+  hints: string[]; // [Position, Nationality, Current Club]
   image: string;
 }
 
