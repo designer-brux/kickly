@@ -97,9 +97,9 @@ export default function GameBoard({ onQuit }: { onQuit?: () => void }) {
               className="absolute inset-0 flex items-center justify-center pointer-events-none"
               style={{
                 maskImage:
-                  "radial-gradient(circle 50px at center, black 100%, transparent 100%)",
+                  "radial-gradient(circle 30px at center, black 100%, transparent 100%)",
                 WebkitMaskImage:
-                  "radial-gradient(circle 50px at center, black 100%, transparent 100%)",
+                  "radial-gradient(circle 30px at center, black 100%, transparent 100%)",
               }}
             >
               <img
