@@ -1,13 +1,16 @@
 "use client";
+
 import { useState } from "react";
 import InstructionsModal from "@/components/InstructionsModal";
 import AdBanner from "@/components/AdBanner";
 import GameBoard from "@/components/GameBoard";
-import DailyHeader from "@/components/DailyHeader"; // Importar novo componente
+import DailyHeader from "@/components/DailyHeader";
+import AboutModal from "@/components/AboutModal"; // Ajustado para @/components para manter o padrão
 
 export default function Home() {
   const [gameState, setGameState] = useState<"home" | "playing">("home");
   const [showInstructions, setShowInstructions] = useState(false);
+  const [isAboutOpen, setIsAboutOpen] = useState(false);
 
   if (gameState === "playing") {
     return (
@@ -50,18 +53,34 @@ export default function Home() {
             >
               How to play?
             </button>
+
+            {/* BOTÃO ABOUT: Inserido logo abaixo dos botões principais */}
+            <button
+              onClick={() => setIsAboutOpen(true)}
+              className="mt-4 text-[#008C6E] font-bold text-sm hover:opacity-80 transition-opacity"
+            >
+              About
+            </button>
           </div>
         </div>
       </div>
 
+      {/* 3. BANNER ABSOLUTO (Mantendo seu estilo original) */}
       <div className="absolute bottom-6 left-6 right-6 h-30 z-20">
         <AdBanner />
       </div>
 
+      {/* MODAIS */}
       <InstructionsModal
         isOpen={showInstructions}
         onClose={() => setShowInstructions(false)}
+        onPlay={() => {
+          setShowInstructions(false); // Fecha o modal
+          setGameState("playing"); // Inicia o jogo
+        }}
       />
+
+      <AboutModal isOpen={isAboutOpen} onClose={() => setIsAboutOpen(false)} />
     </main>
   );
 }
