@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -23,6 +24,7 @@ export default function RootLayout({
 
       {/* ADICIONE AQUI: suppressHydrationWarning na body resolve o erro do ColorZilla */}
       <body suppressHydrationWarning>{children}</body>
+      <GoogleAnalytics gaId="G-9HF7TQZN5F" />
     </html>
   );
 }

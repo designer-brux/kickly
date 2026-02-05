@@ -10,6 +10,7 @@
     "update-db": "node scripts/updatePlayers.js"
   },
   "dependencies": {
+    "@next/third-parties": "^16.1.6",
     "axios": "^1.13.4",
     "canvas-confetti": "^1.9.4",
     "dotenv": "^17.2.3",
